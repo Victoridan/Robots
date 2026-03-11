@@ -1,7 +1,7 @@
 package gui;
 
-//JInternalFrame: Это окно, которое живет внутри JDesktopPane.
-// У него нет собственной рамки ОС, оно управляется главным окном.
+//JInternalFrame: Это окно, которое живет внутри JDesktopPane
+// У него нет собственной рамки ОС, оно управляется главным окном
 
 import java.awt.BorderLayout;
 

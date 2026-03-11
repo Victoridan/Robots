@@ -153,7 +153,7 @@ public class MainApplicationFrame extends JFrame // Наследуемся от 
         try
         {
             UIManager.setLookAndFeel(className); // Устанавливаем новый LookAndFeel
-            SwingUtilities.updateComponentTreeUI(this);// Обновляем все компоненты
+            SwingUtilities.updateComponentTreeUI(this);// Обновляем все компоненты.
         }
         catch (ClassNotFoundException | InstantiationException
                | IllegalAccessException | UnsupportedLookAndFeelException e)

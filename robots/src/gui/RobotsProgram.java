@@ -14,7 +14,7 @@ public class RobotsProgram
       e.printStackTrace();
     }
 
-    // заменяет текст на кнопках на русский язык
+    // заменяет текст на кнопках на русский язык.
     UIManager.put("OptionPane.yesButtonText", "Да");
     UIManager.put("OptionPane.noButtonText", "Нет");
     UIManager.put("OptionPane.cancelButtonText", "Отмена");
