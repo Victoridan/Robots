@@ -35,12 +35,15 @@ public class GameVisualizer extends JPanel
     
     public GameVisualizer() 
     {
+        //Обработка событий таймера (TimerTask)
+        //TimerTask — задача, которая выполняется по расписанию.
+        // run() вызывается автоматически через заданные интервалы.
         m_timer.schedule(new TimerTask()
         {
             @Override
             public void run()
             {
-                onRedrawEvent();
+                onRedrawEvent();// Запускается каждые 50 мс
             }
         }, 0, 50);
         m_timer.schedule(new TimerTask()

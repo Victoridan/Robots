@@ -63,49 +63,30 @@ public class MainApplicationFrame extends JFrame // Наследуемся от 
 
     protected LogWindow createLogWindow()   {
         LogWindow logWindow = new LogWindow(Logger.getDefaultLogSource());
-        // подгружаем состояние
-        WindowConfigManager.WindowState savedState = configManager.LoadState("LogWindow");
-        if (savedState != null) // если оно есть
-        {
-            logWindow.setLocation(savedState.getX(), savedState.getY()); // устанавливаем место на экране
-            logWindow.setSize(savedState.getWidth(), savedState.getHeight()); // устанавливаем параметры
-            try {
-                logWindow.setMaximum(savedState.getState() == 1); // во весь экран
-                logWindow.setIcon(savedState.getState() == 2); // свернуть
-            } catch (Exception ex) {
-            }
-            if (!savedState.isClosed()) { // если не закрыто
-                logWindow.setVisible(true); // делаем видимым
-            }
-        }
-        else { // если конфигурация не найдена
-            logWindow.setLocation(10,10);// позиция на рабочем столе
-            logWindow.setSize(300, 800);// размер окна
-        }
-
-        setMinimumSize(logWindow.getSize());// устанавливаем минимальный размер главного окна, чтобы окно логов точно поместилось
-        logWindow.pack(); // помещаем содержимое окна в окно, регулируем размер
+        logWindow.pack();
         return logWindow;
     }
 
     protected void addWindow(JInternalFrame frame, String windowName) { // добавление окна на рабочий стол
         desktopPane.add(frame); // добавляем окно в контейнер
-        // для игрового окна также пробуем восстановить состояние
-        if ("GameWindow".equals(windowName) && configManager.LoadState(windowName) != null) {
-            WindowConfigManager.WindowState savedState = configManager.LoadState(windowName);
+        // пробуем восстановить состояние для любого окна
+        WindowConfigManager.WindowState savedState = configManager.LoadState(windowName);
+        if (savedState != null) {
             frame.setLocation(savedState.getX(), savedState.getY());
             frame.setSize(savedState.getWidth(), savedState.getHeight());
             try {
-                frame.setMaximum(savedState.getState() == 1);
-                frame.setIcon(savedState.getState() == 2);
-            } catch (Exception ex) {
-            }
+                if (savedState.getState() == 1) { // во весь экран
+                    frame.setMaximum(true);
+                } else if (savedState.getState() == 2) { // свернут
+                    frame.setIcon(true);
+                }
+            } catch (Exception ex) {}
             if (!savedState.isClosed()) {
                 frame.setVisible(true);
             }
         }
         else {
-            frame.setVisible(true);//делаем видимым
+            frame.setVisible(true);
         }
     }
 
