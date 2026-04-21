@@ -1,220 +1,192 @@
 package gui;
 
-import java.awt.Dimension; //используется для задания размеров компонентов (ширина, высота)
-import java.awt.Toolkit;// класс для работы с системными настройками (например, получение размеров экрана)
-import java.awt.event.KeyEvent;//содержит константы для обработки событий клавиатуры
-import java.awt.event.WindowAdapter;//добавлен для обработки события закрытия окна
-import java.awt.event.WindowEvent;//добавлен для обработки события закрытия окна
-
-import javax.swing.JDesktopPane;// контейнер для внутренних окон
-import javax.swing.JFrame;//главное окно приложения
-import javax.swing.JInternalFrame;//  внутреннее окно внутри JDesktopPane
-import javax.swing.JMenu; //  для создания меню приложения
-import javax.swing.JMenuBar;//для создания меню приложения
-import javax.swing.JMenuItem;// для создания меню приложения
-import javax.swing.JOptionPane;// для отображения диалоговых окон (сообщения, подтверждения, ввод данных)
-import javax.swing.SwingUtilities; // класс для работы с Swing например, для потокобезопаснjcnv
-import javax.swing.UIManager;// управление внешним видом
-import javax.swing.UnsupportedLookAndFeelException;//исключение при попытке установить неподдерживаемый внешний вид
-
+import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.util.ArrayList;
+import java.util.List;
+import javax.swing.JDesktopPane;
+import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import log.Logger;
+import model.RobotModel;
 
-/**
- * Что требуется сделать:
- * 1. Метод создания меню перегружен функционалом и трудно читается.
- * Следует разделить его на серию более простых методов (или вообще выделить отдельный класс).
- *
- */
-public class MainApplicationFrame extends JFrame // Наследуемся от JFrame (главное окно ОС)
-{
+public class MainApplicationFrame extends JFrame {
     private final JDesktopPane desktopPane = new JDesktopPane();
-    // Менеджер для сохранения и восстановления состояний окон
-    private final WindowConfigManager configManager = new WindowConfigManager();
-    // Ссылки на окна для сохранения их состояний
-    private LogWindow logWindow;
-    private GameWindow gameWindow;
+
+    // Загрузчик и сохранитель конфигурации
+    private final WindowStateLoader stateLoader = new WindowStateLoader();
+    private final WindowStateSaver stateSaver = new WindowStateSaver();
+    private final RobotModel robotModel = new RobotModel();
+
+    // Единый реестр окон, поддерживающих сохранение состояния
+    private final List<SaveableWindow> saveableWindows = new ArrayList<>();
+
+    // ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ ДЛЯ ОКОН (при первом запуске)
+    private static final int LOG_WINDOW_X = 10;
+    private static final int LOG_WINDOW_Y = 10;
+    private static final int LOG_WINDOW_WIDTH = 300;
+    private static final int LOG_WINDOW_HEIGHT = 800;
+
+    private static final int GAME_WINDOW_X = 350;
+    private static final int GAME_WINDOW_Y = 10;
+    private static final int GAME_WINDOW_WIDTH = 500;
+    private static final int GAME_WINDOW_HEIGHT = 500;
+
+    private static final int COORD_WINDOW_X = 350;
+    private static final int COORD_WINDOW_Y = 520;
+    private static final int COORD_WINDOW_WIDTH = 500;
+    private static final int COORD_WINDOW_HEIGHT = 200;
 
     public MainApplicationFrame() {
-
-        configManager.loadFromFile(); // загружаем сохранённые состояния окон из файла конфигурации
-
-        int inset = 50; // отступ
+        int inset = 50;
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setBounds(inset, inset,
-                screenSize.width  - inset*2,
-                screenSize.height - inset*2);
+        setBounds(inset, inset, screenSize.width - inset * 2, screenSize.height - inset * 2);
+        setContentPane(desktopPane);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
-        setContentPane(desktopPane); // устанавливаем рабочий стол как содержимое окна
-        logWindow = createLogWindow(); // создаем и добавляем окно логов
-        addWindow(logWindow, "LogWindow");
-        gameWindow = new GameWindow(); // создаем и добавляем игровое окно
-        gameWindow.setSize(400,  400);
-        addWindow(gameWindow, "GameWindow");
+        // Создаём и сразу регистрируем окна в едином реестре
+        addSaveableWindow(createLogWindow());
+        addSaveableWindow(new GameWindow(robotModel));
+        addSaveableWindow(createCoordinatesWindow());
 
-        setJMenuBar(generateMenuBar());// создаем и устанавливаем меню
-        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE); // изменяем поведение закрытия: не завершать приложение сразу, а обработать событие
-        addWindowListener(new WindowAdapter() {         // добавляем обработчик закрытия главного окна для сохранения состояний
+        setJMenuBar(generateMenuBar());
+        addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                saveWindowStateAndExit(); // вызывается сохранение и выход
+                confirmExit();
             }
         });
     }
 
-    protected LogWindow createLogWindow()   {
-        LogWindow logWindow = new LogWindow(Logger.getDefaultLogSource());
-        logWindow.pack();
-        return logWindow;
-    }
+    /**
+     * Универсальный метод: добавляет окно в MDI и регистрирует его как SaveableWindow
+     * Восстановление состояния происходит ЗДЕСЬ
+     */
+    private void addSaveableWindow(SaveableWindow window) {
+        if (!(window instanceof JInternalFrame)) return;
 
-    protected void addWindow(JInternalFrame frame, String windowName) { // добавление окна на рабочий стол
-        desktopPane.add(frame); // добавляем окно в контейнер
-        // пробуем восстановить состояние для любого окна
-        WindowConfigManager.WindowState savedState = configManager.LoadState(windowName);
+        // Приводим к JInternalFrame (все наши окна наследуются от него)
+        JInternalFrame frame = (JInternalFrame) window;
+
+        saveableWindows.add(window); // Регистрация для сохранения
+        desktopPane.add(frame);      // Добавление в контейнер
+
+        // Устанавливаем значения по умолчанию (будут перезаписаны, если есть сохранение)
+        applyDefaultWindowSettings(frame, window.getWindowName());
+
+        // Восстановление состояния из конфига (если есть)
+        WindowState savedState = stateLoader.getState(window.getWindowName());
         if (savedState != null) {
-            frame.setLocation(savedState.getX(), savedState.getY());
             frame.setSize(savedState.getWidth(), savedState.getHeight());
+            frame.setLocation(savedState.getX(), savedState.getY());
             try {
-                if (savedState.getState() == 1) { // во весь экран
+                if (savedState.getState() == 1) {
                     frame.setMaximum(true);
-                } else if (savedState.getState() == 2) { // свернут
+                } else if (savedState.getState() == 2) {
                     frame.setIcon(true);
                 }
-            } catch (Exception ex) {}
-            if (!savedState.isClosed()) {
-                frame.setVisible(true);
-            }
+                frame.setClosed(savedState.isClosed());
+            } catch (Exception ignored) {}
         }
-        else {
-            frame.setVisible(true);
+        frame.setVisible(!frame.isClosed());
+    }
+
+    /**
+     * Устанавливает значения по умолчанию для окна (при первом запуске)
+     */
+    private void applyDefaultWindowSettings(JInternalFrame frame, String windowName) {
+        switch (windowName) {
+            case "LogWindow":
+                frame.setLocation(LOG_WINDOW_X, LOG_WINDOW_Y);
+                frame.setSize(LOG_WINDOW_WIDTH, LOG_WINDOW_HEIGHT);
+                break;
+            case "GameWindow":
+                frame.setLocation(GAME_WINDOW_X, GAME_WINDOW_Y);
+                frame.setSize(GAME_WINDOW_WIDTH, GAME_WINDOW_HEIGHT);
+                break;
+            case "CoordinatesWindow":
+                frame.setLocation(COORD_WINDOW_X, COORD_WINDOW_Y);
+                frame.setSize(COORD_WINDOW_WIDTH, COORD_WINDOW_HEIGHT);
+                break;
         }
     }
 
-    private JMenuBar generateMenuBar()// Создаем панель меню
-    {
+    protected LogWindow createLogWindow() {
+        LogWindow lw = new LogWindow(Logger.getDefaultLogSource());
+        lw.pack();
+        return lw;
+    }
+
+    protected RobotCoordinatesWindow createCoordinatesWindow() {
+        RobotCoordinatesWindow cw = new RobotCoordinatesWindow(robotModel);
+        cw.pack();
+        return cw;
+    }
+
+    private JMenuBar generateMenuBar() {
         JMenuBar menuBar = new JMenuBar();
-
-        // МЕНЮ "Файл"
         JMenu fileMenu = new JMenu("Файл");
-        fileMenu.setMnemonic(KeyEvent.VK_F); // Alt + F для быстрого доступа
-
-        // Выход
+        fileMenu.setMnemonic(KeyEvent.VK_F);
         JMenuItem exitMenuItem = new JMenuItem("Выход", KeyEvent.VK_X);
-        exitMenuItem.addActionListener((event) -> {// addActionListener: Подключает обработчик события. Когда пользователь кликает на пункт меню, выполняется код внутри лямбды.
-            confirmExit(); // Вызываем метод подтверждения выхода
-        });
-        fileMenu.add(exitMenuItem);// Добавляем пункт в меню
+        exitMenuItem.addActionListener(event -> confirmExit());
+        fileMenu.add(exitMenuItem);
 
         JMenu lookAndFeelMenu = new JMenu("Режим отображения");
         lookAndFeelMenu.setMnemonic(KeyEvent.VK_V);
-        lookAndFeelMenu.getAccessibleContext().setAccessibleDescription(
-                "Управление режимом отображения приложения");
+        JMenuItem systemLookAndFeel = new JMenuItem("Системная схема", KeyEvent.VK_S);
+        systemLookAndFeel.addActionListener(event -> setLookAndFeel(UIManager.getSystemLookAndFeelClassName()));
+        lookAndFeelMenu.add(systemLookAndFeel);
+        JMenuItem crossplatformLookAndFeel = new JMenuItem("Универсальная схема", KeyEvent.VK_U);
+        crossplatformLookAndFeel.addActionListener(event -> setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName()));
+        lookAndFeelMenu.add(crossplatformLookAndFeel);
 
-        {
-            // позволяет менять внешний вид программы на системный (как у Windows) или универсальный
-            JMenuItem systemLookAndFeel = new JMenuItem("Системная схема", KeyEvent.VK_S);
-            systemLookAndFeel.addActionListener((event) -> {
-                setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                this.invalidate();
-            });
-            lookAndFeelMenu.add(systemLookAndFeel);
-        }
-
-        {
-            JMenuItem crossplatformLookAndFeel = new JMenuItem("Универсальная схема", KeyEvent.VK_S);
-            crossplatformLookAndFeel.addActionListener((event) -> {
-                setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-                this.invalidate();
-            });
-            lookAndFeelMenu.add(crossplatformLookAndFeel);
-        }
         JMenu testMenu = new JMenu("Тесты");
         testMenu.setMnemonic(KeyEvent.VK_T);
-        testMenu.getAccessibleContext().setAccessibleDescription(
-                "Тестовые команды");
+        JMenuItem addLogMessageItem = new JMenuItem("Сообщение в лог", KeyEvent.VK_M);
+        addLogMessageItem.addActionListener(event -> Logger.debug("Новая строка"));
+        testMenu.add(addLogMessageItem);
 
-        {
-            JMenuItem addLogMessageItem = new JMenuItem("Сообщение в лог", KeyEvent.VK_S);
-            addLogMessageItem.addActionListener((event) -> {
-                Logger.debug("Новая строка");
-            });
-            testMenu.add(addLogMessageItem);
-        }
-
-        // Добавляем все меню
         menuBar.add(fileMenu);
         menuBar.add(lookAndFeelMenu);
         menuBar.add(testMenu);
-
         return menuBar;
     }
 
-    //         Метод для подтверждения выхода из приложения
-
     private void confirmExit() {
-        // Показываем диалог подтверждения
         int result = JOptionPane.showConfirmDialog(
-                this,
-                "Вы действительно хотите выйти из программы?",
-                "Подтверждение выхода",
-                JOptionPane.YES_NO_OPTION,// Кнопки Да/Нет
-                JOptionPane.QUESTION_MESSAGE// Иконка вопроса
-        );
-
+                this, "Вы действительно хотите выйти из программы?",
+                "Подтверждение выхода", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
         if (result == JOptionPane.YES_OPTION) {
-            saveWindowStateAndExit(); // Сохраняем состояния и завершаем программу
+            saveAllWindowsAndExit();
         }
     }
 
-    private void saveWindowStateAndExit()
-    {
-        if (logWindow != null) { // если окно создано
-            saveWindowState(logWindow, "LogWindow");
+    /**
+     * Автоматическое сохранение состояния ВСЕХ зарегистрированных окон
+     */
+    private void saveAllWindowsAndExit() {
+        for (SaveableWindow window : saveableWindows) {
+            stateSaver.saveState(window.getWindowName(), window.getWindowState());
         }
-        if (gameWindow != null) {
-            saveWindowState(gameWindow, "GameWindow");
-        }
-        configManager.SaveToFile();
+        stateSaver.saveToFile();
         System.exit(0);
     }
 
-    private void saveWindowState(JInternalFrame frame, String windowName) {
+    private void setLookAndFeel(String className) {
         try {
-            int state = 0; // просто окно
-            if (frame.isMaximum()) {
-                state = 1; // во весь экран
-            }
-            else if (frame.isIcon()) {
-                state = 2; // свернуто в иконку
-            }
-
-            WindowConfigManager.WindowState windowState = new WindowConfigManager.WindowState(
-                    frame.getX(),
-                    frame.getY(),
-                    frame.getWidth(),
-                    frame.getHeight(),
-                    state,
-                    frame.isClosed()
-            );
-
-            configManager.SaveState(windowName, windowState);
-        }
-        catch (Exception e) {
-            System.err.println(String.format("Error saving state for %s: %s", windowName, e.getMessage()));
-        }
-    }
-
-    private void setLookAndFeel(String className)
-    {
-        try
-        {
-            UIManager.setLookAndFeel(className); // Устанавливаем новый LookAndFeel
-            SwingUtilities.updateComponentTreeUI(this);// Обновляем все компоненты.
-        }
-        catch (ClassNotFoundException | InstantiationException
-               | IllegalAccessException | UnsupportedLookAndFeelException e)
-        {
-            // just ignore
+            UIManager.setLookAndFeel(className);
+            SwingUtilities.updateComponentTreeUI(this);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
