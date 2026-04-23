@@ -32,6 +32,7 @@ public class RobotModel {
      */
     public interface RobotModelListener {
         void onRobotPositionChanged(double x, double y, double direction);
+        void onTargetPositionChanged(int x, int y);
     }
 
     /**
@@ -64,11 +65,13 @@ public class RobotModel {
     public void setTargetPosition(int x, int y) {
         m_targetPositionX = x;
         m_targetPositionY = y;
+        notifyTargetListeners();
     }
 
     public void setTargetPosition(double x, double y) {
         m_targetPositionX = (int)x;
         m_targetPositionY = (int)y;
+        notifyTargetListeners();
     }
 
     /**
@@ -186,6 +189,16 @@ public class RobotModel {
         }
         for (RobotModelListener listener : listenersCopy) {
             listener.onRobotPositionChanged(m_robotPositionX, m_robotPositionY, m_robotDirection);
+        }
+    }
+
+    private void notifyTargetListeners() {
+        List<RobotModelListener> listenersCopy;
+        synchronized(listeners) {
+            listenersCopy = new ArrayList<>(listeners);
+        }
+        for (RobotModelListener listener : listenersCopy) {
+            listener.onTargetPositionChanged(m_targetPositionX, m_targetPositionY);
         }
     }
 

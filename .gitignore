@@ -2,3 +2,7 @@
 /robots/.settings
 /robots/bin
 eclipse.bat
+.idea/
+out/
+*.class
+*.jar

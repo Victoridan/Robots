@@ -11,7 +11,7 @@ import model.RobotModel;
  * этот класс:
  * — отображает данные модели
  *  — подписывается на обновления модели
-  мы видим точные координаты робота в реальном времени
+ мы видим точные координаты робота в реальном времени
  */
 
 public class RobotCoordinatesWindow extends JInternalFrame implements RobotModel.RobotModelListener, SaveableWindow {
@@ -56,12 +56,21 @@ public class RobotCoordinatesWindow extends JInternalFrame implements RobotModel
 
         m_coordinatesDisplay.setText(sb.toString());
     }
-// вызываем и реагируем на событие (обновляем координаты)
+    // вызываем и реагируем на событие (обновляем координаты)
     @Override
     public void onRobotPositionChanged(double x, double y, double direction) {
+        updateCoordinates(x, y, direction);
+    }
+
+    @Override
+    public void onTargetPositionChanged(int x, int y) {
+        // Окно координат может игнорировать изменение цели или тоже как-то отображать
+    }
+
+    private void updateCoordinates(double x, double y, double direction) {
         EventQueue.invokeLater(this::updateDisplay);
     }
-//Возвращает уникальное строковое имя окна.
+    //Возвращает уникальное строковое имя окна.
     @Override
     public String getWindowName() {
         return "CoordinatesWindow";

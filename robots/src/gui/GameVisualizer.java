@@ -5,11 +5,7 @@ import java.awt.EventQueue;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.geom.AffineTransform;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import javax.swing.JPanel;
 
@@ -23,54 +19,16 @@ import model.RobotModel;
  * - Реализует паттерн MVC: View (отображение) отделена от Model (данные)
  */
 public class GameVisualizer extends JPanel implements RobotModel.RobotModelListener {
-    private final Timer m_timer = initTimer();
     private RobotModel m_model;
-
-    private static Timer initTimer() {
-        return new Timer("events generator", true);
-    }
 
     public GameVisualizer(RobotModel model) {
         m_model = model;
         m_model.addListener(this); // Подписываемся на обновления модели
-
-        // Таймер для перерисовки (50 мс = 20 FPS)
-        m_timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                onRedrawEvent();
-            }
-        }, 0, 50);
-
-        // Таймер для обновления позиции модели (10 мс)
-        m_timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                onModelUpdateEvent();
-            }
-        }, 0, 10);
-
-        // Обработчик кликов мыши для установки цели
-        addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                setTargetPosition(e.getPoint());
-            }
-        });
-
         setDoubleBuffered(true);
-    }
-    // Controller: обрабатывает действие пользователя
-    protected void setTargetPosition(Point p) {
-        m_model.setTargetPosition(p.x, p.y); // Изменяем модель
     }
 
     protected void onRedrawEvent() {
         EventQueue.invokeLater(this::repaint);
-    }
-    // Controller: запускает обновление модели
-    protected void onModelUpdateEvent() {
-        m_model.updatePosition(); // Модель сама обновляет своё состояние
     }
 
     private static int round(double value) {
@@ -93,8 +51,12 @@ public class GameVisualizer extends JPanel implements RobotModel.RobotModelListe
 
     @Override
     public void onRobotPositionChanged(double x, double y, double direction) {
-        // Модель уведомляет об изменениях, но перерисовка идет по таймеру
-        // Этот метод можно использовать для мгновенного обновления при необходимости
+        onRedrawEvent();
+    }
+
+    @Override
+    public void onTargetPositionChanged(int x, int y) {
+        onRedrawEvent();
     }
 
     private static void fillOval(Graphics g, int centerX, int centerY, int diam1, int diam2) {
