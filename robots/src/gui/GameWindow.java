@@ -12,8 +12,8 @@ public class GameWindow extends JInternalFrame implements SaveableWindow {
 
     public GameWindow(RobotModel model) {
         super("Игровое поле", true, true, true, true);
-        m_visualizer = new GameVisualizer(model);
-        m_controller = new GameController(model, m_visualizer);
+        m_visualizer = new GameVisualizer(model); // создаём View
+        m_controller = new GameController(model, m_visualizer); // создаём Controller
         JPanel panel = new JPanel(new BorderLayout());
         panel.add(m_visualizer, BorderLayout.CENTER);
         getContentPane().add(panel);

@@ -46,7 +46,7 @@ public class RobotModel {
     }
 
     /**
-     * Отписка от обновлений (для предотвращения утечек памяти).
+     * Отписка от обновлений.
      */
     public void removeListener(RobotModelListener listener) {
         synchronized(listeners) {
@@ -65,7 +65,7 @@ public class RobotModel {
     public void setTargetPosition(int x, int y) {
         m_targetPositionX = x;
         m_targetPositionY = y;
-        notifyTargetListeners();
+        notifyTargetListeners();  // Уведомляем об изменении цели
     }
 
     public void setTargetPosition(double x, double y) {

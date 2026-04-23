@@ -25,8 +25,7 @@ public class MainApplicationFrame extends JFrame {
     // Загрузчик и сохранитель конфигурации
     private final WindowStateLoader stateLoader = new WindowStateLoader();
     private final WindowStateSaver stateSaver = new WindowStateSaver();
-    private final RobotModel robotModel = new RobotModel();
-
+    private final RobotModel robotModel;
     // Единый реестр окон, поддерживающих сохранение состояния
     private final List<SaveableWindow> saveableWindows = new ArrayList<>();
 
@@ -46,19 +45,21 @@ public class MainApplicationFrame extends JFrame {
     private static final int COORD_WINDOW_WIDTH = 500;
     private static final int COORD_WINDOW_HEIGHT = 200;
 
-    public MainApplicationFrame() {
+    public MainApplicationFrame(RobotModel model) {
+        this.robotModel = model;
+
         int inset = 50;
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         setBounds(inset, inset, screenSize.width - inset * 2, screenSize.height - inset * 2);
         setContentPane(desktopPane);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-
         // Создаём и сразу регистрируем окна в едином реестре
         addSaveableWindow(createLogWindow());
         addSaveableWindow(new GameWindow(robotModel));
         addSaveableWindow(createCoordinatesWindow());
 
         setJMenuBar(generateMenuBar());
+
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -68,40 +69,8 @@ public class MainApplicationFrame extends JFrame {
     }
 
     /**
-     * Универсальный метод: добавляет окно в MDI и регистрирует его как SaveableWindow
-     * Восстановление состояния происходит ЗДЕСЬ
-     */
-    private void addSaveableWindow(SaveableWindow window) {
-        if (!(window instanceof JInternalFrame)) return;
-
-        // Приводим к JInternalFrame (все наши окна наследуются от него)
-        JInternalFrame frame = (JInternalFrame) window;
-
-        saveableWindows.add(window); // Регистрация для сохранения
-        desktopPane.add(frame);      // Добавление в контейнер
-
-        // Устанавливаем значения по умолчанию (будут перезаписаны, если есть сохранение)
-        applyDefaultWindowSettings(frame, window.getWindowName());
-
-        // Восстановление состояния из конфига (если есть)
-        WindowState savedState = stateLoader.getState(window.getWindowName());
-        if (savedState != null) {
-            frame.setSize(savedState.getWidth(), savedState.getHeight());
-            frame.setLocation(savedState.getX(), savedState.getY());
-            try {
-                if (savedState.getState() == 1) {
-                    frame.setMaximum(true);
-                } else if (savedState.getState() == 2) {
-                    frame.setIcon(true);
-                }
-                frame.setClosed(savedState.isClosed());
-            } catch (Exception ignored) {}
-        }
-        frame.setVisible(!frame.isClosed());
-    }
-
-    /**
-     * Устанавливает значения по умолчанию для окна (при первом запуске)
+     * Устанавливает значения по умолчанию для окна (при первом запуске).
+     * Вызывается ДО восстановления из конфига.
      */
     private void applyDefaultWindowSettings(JInternalFrame frame, String windowName) {
         switch (windowName) {
@@ -119,6 +88,37 @@ public class MainApplicationFrame extends JFrame {
                 break;
         }
     }
+    /**
+     * Универсальный метод: добавляет окно в MDI и регистрирует его как SaveableWindow
+     * Восстановление состояния происходит ЗДЕСЬ
+     */
+    private void addSaveableWindow(SaveableWindow window) {
+        if (!(window instanceof JInternalFrame)) return;
+        JInternalFrame frame = (JInternalFrame) window;
+
+        saveableWindows.add(window);// Регистрация для сохранения
+        desktopPane.add(frame);// Добавление в контейнер
+
+        // 1. СНАЧАЛА устанавливаем значения по умолчанию
+        applyDefaultWindowSettings(frame, window.getWindowName());
+
+        // 2. ПОТОМ, если есть сохранённое состояние — перезаписываем его
+        WindowState savedState = stateLoader.getState(window.getWindowName());
+        if (savedState != null) {
+            frame.setSize(savedState.getWidth(), savedState.getHeight());
+            frame.setLocation(savedState.getX(), savedState.getY());
+            try {
+                if (savedState.getState() == 1) {
+                    frame.setMaximum(true);
+                } else if (savedState.getState() == 2) {
+                    frame.setIcon(true);
+                }
+                frame.setClosed(savedState.isClosed());
+            } catch (Exception ignored) {}
+        }
+
+        frame.setVisible(!frame.isClosed());
+    }
 
     protected LogWindow createLogWindow() {
         LogWindow lw = new LogWindow(Logger.getDefaultLogSource());
@@ -134,6 +134,7 @@ public class MainApplicationFrame extends JFrame {
 
     private JMenuBar generateMenuBar() {
         JMenuBar menuBar = new JMenuBar();
+
         JMenu fileMenu = new JMenu("Файл");
         fileMenu.setMnemonic(KeyEvent.VK_F);
         JMenuItem exitMenuItem = new JMenuItem("Выход", KeyEvent.VK_X);
@@ -163,13 +164,16 @@ public class MainApplicationFrame extends JFrame {
 
     private void confirmExit() {
         int result = JOptionPane.showConfirmDialog(
-                this, "Вы действительно хотите выйти из программы?",
-                "Подтверждение выхода", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                this,
+                "Вы действительно хотите выйти из программы?",
+                "Подтверждение выхода",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
         if (result == JOptionPane.YES_OPTION) {
             saveAllWindowsAndExit();
         }
     }
-
     /**
      * Автоматическое сохранение состояния ВСЕХ зарегистрированных окон
      */
